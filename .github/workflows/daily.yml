@@ -2,8 +2,7 @@ name: Daily A-share Picks Update
 
 on:
   schedule:
-    # 北京 9:00 = UTC 01:00. GH Actions cron may delay 5-15 min.
-    - cron: '0 1 * * *'
+    - cron: '0 1 * * *'  # 北京 9:00 = UTC 01:00
   workflow_dispatch:
 
 permissions:
@@ -34,10 +33,9 @@ jobs:
       - name: 01 Download bars (parallel baostock)
         run: python scripts/01_download.py --workers 6
 
-      # STAR-evolved picker (industrial-grade, DSR +7.42 on held-out)
-      # Falls back to legacy heuristic if star_picker_winner.py is missing.
-      - name: 02 Generate daily picks (STAR-evolved Chaikin money flow + accumulation)
+      - name: 02 Generate daily picks (STAR-evolved)
         run: |
+          mkdir -p data/ashare
           if [ -f scripts/star_picker_winner.py ]; then
             cp scripts/star_picker_winner.py data/ashare/star_picker_winner.py
             python scripts/02_picks_star.py
@@ -47,6 +45,17 @@ jobs:
 
       - name: 03 Generate M&A targets
         run: python scripts/03_ma.py --top-k 10
+
+      - name: 05 Shadow simulator (incremental update)
+        run: |
+          if [ -f scripts/shadow_portfolio.parquet ]; then
+            cp scripts/shadow_portfolio.parquet data/ashare/shadow_portfolio.parquet
+          fi
+          python scripts/05_shadow_update.py update
+          cp data/ashare/shadow_portfolio.parquet scripts/shadow_portfolio.parquet
+
+      - name: 06 Render shadow performance panel
+        run: python scripts/06_shadow_panel.py
 
       - name: 04 Render webpage
         run: python scripts/04_render.py
@@ -58,13 +67,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
+          git add index.html scripts/shadow_portfolio.parquet
           if git diff --cached --quiet; then
             echo "no changes — nothing to commit"
             exit 0
           fi
           DATE=$(date -u +'%Y-%m-%d %H:%M UTC')
-          git commit -m "Auto update $DATE (STAR picker)"
+          git commit -m "Auto update $DATE (STAR + shadow)"
           for i in 1 2 3; do
             git pull --rebase origin main && git push && exit 0
             echo "push attempt $i failed; sleeping 5s and retrying"

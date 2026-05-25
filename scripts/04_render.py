@@ -28,6 +28,7 @@ IN_MA = DATA / "ma_targets.json"
 BARS = (DATA / "all_a_share_bars.parquet"
         if (DATA / "all_a_share_bars.parquet").exists()
         else DATA / "csi300_bars.parquet")
+SHADOW_PANEL = Path("viz/shadow_panel.html")
 OUT = Path("viz/daily_picks.html")
 
 
@@ -442,6 +443,7 @@ def main() -> int:
     cards_html = "".join(_pick_card(p, i + 1) for i, p in enumerate(picks))
     temp_html = _temp_gauge(temp, color)
     ma_html = _ma_block(ma_top)
+    shadow_html = SHADOW_PANEL.read_text(encoding="utf-8") if SHADOW_PANEL.exists() else ""
 
     html = f"""<!doctype html>
 <html lang="zh-CN">
@@ -552,6 +554,41 @@ def main() -> int:
              border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 4px; }}
   .warn-line {{ font-size: 11px; color: #b91c1c; margin-top: 4px; }}
 
+  /* Shadow panel */
+  .shadow-panel {{ background: white; border-radius: 16px; padding: 28px;
+                   margin-top: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }}
+  .shadow-panel h2 {{ font-size: 24px; margin: 0 0 8px; color: #111827; }}
+  .shadow-panel .sub {{ font-size: 13px; color: #6b7280; margin: 0 0 14px; line-height: 1.6; }}
+  .shadow-panel.empty {{ padding: 24px; color: #6b7280; font-size: 13px; }}
+  .verdict-good {{ background: #dcfce7; border-left: 4px solid #16a34a;
+                    padding: 14px 18px; margin: 14px 0; font-size: 14px;
+                    color: #166534; border-radius: 4px; font-weight: 600; }}
+  .verdict-marginal {{ background: #fef3c7; border-left: 4px solid #f59e0b;
+                        padding: 14px 18px; margin: 14px 0; font-size: 14px;
+                        color: #92400e; border-radius: 4px; font-weight: 600; }}
+  .verdict-bad {{ background: #fee2e2; border-left: 4px solid #dc2626;
+                   padding: 14px 18px; margin: 14px 0; font-size: 14px;
+                   color: #991b1b; border-radius: 4px; font-weight: 600; }}
+  .shadow-stats {{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;
+                    margin: 18px 0; }}
+  .stat-cell {{ text-align: center; padding: 12px 8px; background: #fafafa;
+                 border-radius: 8px; border: 1px solid #f3f4f6; }}
+  .sn {{ font-size: 22px; font-weight: 800; line-height: 1; }}
+  .sn.up {{ color: #dc2626; }}
+  .sn.down {{ color: #16a34a; }}
+  .sl {{ font-size: 11px; color: #6b7280; margin-top: 4px; }}
+  .shadow-table {{ width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }}
+  .shadow-table th {{ text-align: left; padding: 8px; background: #f3f4f6; color: #4b5563;
+                       border-bottom: 2px solid #e5e7eb; font-weight: 700; font-size: 12px; }}
+  .shadow-table td {{ padding: 10px 8px; border-bottom: 1px solid #f3f4f6; }}
+  .shadow-table .num {{ text-align: right; font-family: monospace; font-weight: 600; }}
+  .shadow-table .num.up {{ color: #dc2626; }}
+  .shadow-table .num.down {{ color: #16a34a; }}
+  .shadow-table .code-tag {{ display: inline-block; padding: 1px 6px;
+                              background: #f3f4f6; color: #6b7280;
+                              border-radius: 4px; font-size: 11px; margin-left: 4px;
+                              font-family: monospace; }}
+
   footer {{ text-align: center; color: #9ca3af; font-size: 12px;
             margin-top: 40px; padding: 20px; border-top: 1px solid #e5e7eb; }}
   .disclaimer {{ background: #fef3c7; border-left: 4px solid #f59e0b;
@@ -585,6 +622,7 @@ def main() -> int:
 
 <div class="container">
   {cards_html}
+  {shadow_html}
   {ma_html}
 
   <div class="disclaimer">
