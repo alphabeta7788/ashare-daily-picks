@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+# Avoid two scheduled runs racing each other on the same ref
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -42,15 +47,22 @@ jobs:
       - name: Copy to index.html
         run: cp viz/daily_picks.html index.html
 
-      - name: Commit + push if changed
+      - name: Commit + push if changed (rebase-safe)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           if git diff --cached --quiet; then
-            echo "no changes"
+            echo "no changes — nothing to commit"
             exit 0
           fi
           DATE=$(date -u +'%Y-%m-%d %H:%M UTC')
           git commit -m "Auto update $DATE"
-          git push
+          # Retry up to 3 times: rebase on remote, push
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            echo "push attempt $i failed; sleeping 5s and retrying"
+            sleep 5
+          done
+          echo "push failed after 3 attempts"
+          exit 1
