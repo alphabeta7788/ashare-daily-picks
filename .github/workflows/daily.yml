@@ -15,7 +15,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -30,12 +30,25 @@ jobs:
       - name: 00 Fetch universe
         run: python scripts/00_universe.py
 
-      - name: 01 Download bars (parallel baostock)
-        run: python scripts/01_download.py --workers 6
+      # Restore bars cache (committed in repo) → data/ashare/
+      - name: Restore bars cache
+        run: |
+          mkdir -p data/ashare
+          if [ -f scripts/all_a_share_bars.parquet ]; then
+            cp scripts/all_a_share_bars.parquet data/ashare/all_a_share_bars.parquet
+            echo "Cached bars restored: $(du -h data/ashare/all_a_share_bars.parquet)"
+          fi
+
+      # Incremental download — fetches only new dates since cached max
+      - name: 01 Download bars (INCREMENTAL)
+        run: python scripts/01_download.py --workers 6 --safety-overlap-days 5
+
+      # Save cache back to repo
+      - name: Persist bars cache
+        run: cp data/ashare/all_a_share_bars.parquet scripts/all_a_share_bars.parquet
 
       - name: 02 Generate daily picks (STAR-evolved)
         run: |
-          mkdir -p data/ashare
           if [ -f scripts/star_picker_winner.py ]; then
             cp scripts/star_picker_winner.py data/ashare/star_picker_winner.py
             python scripts/02_picks_star.py
@@ -67,17 +80,16 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html scripts/shadow_portfolio.parquet
+          git add index.html scripts/all_a_share_bars.parquet scripts/shadow_portfolio.parquet
           if git diff --cached --quiet; then
             echo "no changes — nothing to commit"
             exit 0
           fi
           DATE=$(date -u +'%Y-%m-%d %H:%M UTC')
-          git commit -m "Auto update $DATE (STAR + shadow)"
+          git commit -m "Auto update $DATE (incremental bars + shadow)"
           for i in 1 2 3; do
             git pull --rebase origin main && git push && exit 0
-            echo "push attempt $i failed; sleeping 5s and retrying"
+            echo "push attempt $i failed; sleeping 5s"
             sleep 5
           done
-          echo "push failed after 3 attempts"
           exit 1
