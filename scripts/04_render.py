@@ -216,9 +216,9 @@ def _monte_carlo_cone(pick: dict) -> str:
 # "10000 元能赚多少" 模拟
 
 def _buy_10k_widget(pick: dict) -> str:
+    """假如今天买一手 (100 股 = A 股最小交易单位)。"""
     lv = pick["levels"]
-    invest = 10000
-    n_shares = int(invest / lv["buy"] / 100) * 100  # 100 股为单位
+    n_shares = 100  # 一手 = 100 股
     actual_invest = n_shares * lv["buy"]
     target_value = n_shares * lv["target"]
     stop_value = n_shares * lv["stop"]
@@ -226,12 +226,12 @@ def _buy_10k_widget(pick: dict) -> str:
     stop_pl = stop_value - actual_invest
     return f"""
     <div class="buy10k">
-      <div class="b10-title">💰 假如你今天买 ¥10,000</div>
+      <div class="b10-title">💰 假如你今天买 1 手 (100 股)</div>
       <div class="b10-grid">
         <div class="b10-item">
-          <div class="b10-label">买入</div>
-          <div class="b10-num neutral">{n_shares} 股 @ ¥{lv['buy']}</div>
-          <div class="b10-sub">实际投入 ¥{actual_invest:,.0f}</div>
+          <div class="b10-label">入场成本</div>
+          <div class="b10-num neutral">¥{actual_invest:,.0f}</div>
+          <div class="b10-sub">100 股 @ ¥{lv['buy']}</div>
         </div>
         <div class="b10-item up">
           <div class="b10-label">🎯 目标位卖出</div>
@@ -569,9 +569,9 @@ def main() -> int:
 <div class="hero">
   <h1 class="hero-title">📈 今日 A 股 · 3 大金股</h1>
   <div class="hero-sub">
-    短线买点 · 量化打分 · 直接观点
+    {('🤖 <b>STAR 自进化 picker</b> · 持平 +5pp 5日超额回测 · ' if data.get('method', '').startswith('STAR') else '短线买点 · ')}量化打分 · 直接观点
     <span class="date-chip">{data['as_of'][:10]}</span>
-  </div>
+  </div>{('<div class="hero-sub" style="font-size:12px;opacity:0.7;margin-top:6px">picker: ' + ' · '.join(f"{p['name']} (+{p['held_out_5d_top3_excess_pp']}pp hit {int(p['hit_rate_above_5pp']*100)}%)" for p in data.get('method_provenance', {}).get('pickers', [])) + '</div>' if data.get('method', '').startswith('STAR') else '')}
   <div class="gauge-wrap">{temp_html}</div>
   <div class="mood-tag">市场情绪: {mood}</div>
   <div class="breadth-row">
