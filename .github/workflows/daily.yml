@@ -1,0 +1,56 @@
+name: Daily A-share Picks Update
+
+on:
+  schedule:
+    # 北京 9:00 = UTC 01:00. GH Actions cron may delay 5-15 min.
+    - cron: '0 1 * * *'
+  workflow_dispatch:  # manual trigger via Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: 00 Fetch universe
+        run: python scripts/00_universe.py
+
+      - name: 01 Download bars (parallel baostock)
+        run: python scripts/01_download.py --workers 6
+
+      - name: 02 Generate daily picks
+        run: python scripts/02_picks.py --top-k 3
+
+      - name: 03 Generate M&A targets
+        run: python scripts/03_ma.py --top-k 10
+
+      - name: 04 Render webpage
+        run: python scripts/04_render.py
+
+      - name: Copy to index.html
+        run: cp viz/daily_picks.html index.html
+
+      - name: Commit + push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "no changes"
+            exit 0
+          fi
+          DATE=$(date -u +'%Y-%m-%d %H:%M UTC')
+          git commit -m "Auto update $DATE"
+          git push
